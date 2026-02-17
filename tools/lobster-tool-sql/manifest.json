@@ -1,0 +1,67 @@
+{
+  "name": "lobster-tool-sql",
+  "version": "1.0.0",
+  "author": "LobsterShell Team",
+  "license": "MIT",
+  "description": "只读 SQL 查询工具包",
+  
+  "tools": [
+    {
+      "id": "sql.readonly_query",
+      "name": "SQL 只读查询",
+      "module": "readonly_query",
+      "class": "SQLReadOnlyQueryTool",
+      "category": "database",
+      "permissions": ["database:read"],
+      "dangerous": false,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "SQL 查询语句"},
+          "database": {"type": "string", "description": "数据库名称"}
+        },
+        "required": ["query"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "rows": {"type": "array"},
+          "row_count": {"type": "integer"}
+        }
+      }
+    },
+    {
+      "id": "sql.schema_inspect",
+      "name": "数据库模式检查",
+      "module": "schema_inspector",
+      "class": "SchemaInspectorTool",
+      "category": "database",
+      "permissions": ["database:read", "database:metadata"],
+      "dangerous": false,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "database": {"type": "string"},
+          "table": {"type": "string"}
+        }
+      }
+    }
+  ],
+  
+  "dependencies": {
+    "python": ">=3.10",
+    "packages": ["sqlalchemy>=2.0"]
+  },
+  
+  "security": {
+    "sandbox_required": true,
+    "network_access": false,
+    "filesystem_access": false,
+    "env_vars": ["DATABASE_URL"]
+  },
+  
+  "compatibility": {
+    "lobstershell_core": ">=0.1.0",
+    "platforms": ["linux", "macos", "windows"]
+  }
+}
