@@ -17,6 +17,7 @@ LobsterShell - 微内核 AI Agent 装甲
 
 from typing import Any, Dict, List, Optional
 import logging
+from importlib import import_module
 
 # 核心组件
 from .core.interfaces.tool_interface import (
@@ -32,9 +33,13 @@ from .core.tool_runtime.registry import ToolRegistry
 from .core.tool_runtime.executor import ToolExecutor
 
 # 旧版兼容
-from .00_core.mode_controller import ModeController, ModeConfig
-from .00_core.policy_engine import PolicyEngine
-from .00_core.audit_logger import AuditLogger
+_mode_controller = import_module(".00_core.mode_controller", __name__)
+ModeController = _mode_controller.ModeController
+ModeConfig = _mode_controller.ModeConfig
+PolicyEngine = import_module(".00_core.policy_engine", __name__).PolicyEngine
+_audit_logger_module = import_module(".00_core.audit_logger", __name__)
+AuditLogger = _audit_logger_module.AuditLogger
+AuditLevel = _audit_logger_module.AuditLevel
 
 __version__ = "0.2.0"
 __author__ = "LobsterShell Team"
@@ -179,8 +184,6 @@ class LobsterShell:
     async def _audit_callback(self, audit_data: dict):
         """审计回调"""
         if self.audit_logger:
-            from .00_core.audit_logger import AuditLevel
-            
             self.audit_logger.log(
                 action=audit_data["tool_id"],
                 level=AuditLevel.INFO if audit_data["success"] else AuditLevel.WARNING,

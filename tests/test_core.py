@@ -6,6 +6,7 @@
 
 import pytest
 from datetime import datetime
+from importlib import import_module
 
 # 由於我們使用相對導入，需要先安裝或調整路徑
 import sys
@@ -13,9 +14,17 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from 00_core.mode_controller import ModeController, ModeConfig, calculate_sensitivity
-from 00_core.policy_engine import PolicyEngine, ActionType, PolicyRule
-from 00_core.audit_logger import AuditLogger, AuditLevel
+_mode_controller = import_module("00_core.mode_controller")
+ModeController = _mode_controller.ModeController
+ModeConfig = _mode_controller.ModeConfig
+calculate_sensitivity = _mode_controller.calculate_sensitivity
+_policy_engine = import_module("00_core.policy_engine")
+PolicyEngine = _policy_engine.PolicyEngine
+ActionType = _policy_engine.ActionType
+PolicyRule = _policy_engine.PolicyRule
+_audit_logger = import_module("00_core.audit_logger")
+AuditLogger = _audit_logger.AuditLogger
+AuditLevel = _audit_logger.AuditLevel
 
 
 class TestModeController:
