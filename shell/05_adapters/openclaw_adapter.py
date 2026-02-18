@@ -10,6 +10,7 @@ import logging
 from importlib import import_module
 
 logger = logging.getLogger(__name__)
+_calculate_sensitivity = import_module("shell.00_core.mode_controller").calculate_sensitivity
 
 
 @dataclass
@@ -56,10 +57,8 @@ class OpenClawAdapter:
         Returns:
             WrappedResponse: 包裝後的響應
         """
-        calculate_sensitivity = import_module("shell.00_core.mode_controller").calculate_sensitivity
-
         # 1. 計算敏感度
-        sensitivity = calculate_sensitivity(request)
+        sensitivity = _calculate_sensitivity(request)
 
         # 2. 決定模式
         mode_decision = self.shell.mode_controller.decide_mode(
