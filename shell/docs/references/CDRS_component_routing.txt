@@ -1,0 +1,201 @@
+# ContextLinker 组件数据路由系统（CDRS）
+## 动态编码转换与协议对接层
+
+**核心概念**：所有组件编码定义都是**变量映射**，系统自动处理协议转换与路由
+
+---
+
+## 系统架构总览
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                   组件数据路由系统 (CDRS)                           │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  Layer 1: 组件定义层 (Component Definition Layer)                 │
+│  ├─ 组件名称                                                      │
+│  ├─ 编码方案名称 (encoding_scheme)                               │
+│  ├─ 编码总位数 (total_bits)                                      │
+│  └─ 依赖组件列表 (dependencies)                                  │
+│                                                                    │
+│  Layer 2: 编码定义层 (Encoding Definition Layer)                 │
+│  ├─ 编码区段列表 (segments)                                      │
+│  │  ├─ segment_id (区段唯一标识)                                │
+│  │  ├─ segment_name (区段名称)                                  │
+│  │  ├─ bit_offset (起始位置)                                    │
+│  │  ├─ bit_length (区段位数)                                    │
+│  │  ├─ attribute_definition (属性定义)                          │
+│  │  └─ data_type (int/bytes/float/enum)                        │
+│  └─ 编码版本控制 (version, deprecated_at)                       │
+│                                                                    │
+│  Layer 3: 转换规则层 (Conversion Rule Layer)                     │
+│  ├─ 组件间转换规则表 (conversion_matrix)                        │
+│  ├─ 位数不一致时的转换策略                                      │
+│  ├─ 属性不相容时的映射规则                                      │
+│  └─ 转换优先级 (priority)                                       │
+│                                                                    │
+│  Layer 4: 路由执行层 (Routing Execution Layer)                   │
+│  ├─ 路由决策引擎 (routing_engine)                               │
+│  ├─ 动态转换器 (dynamic_converter)                              │
+│  ├─ 协议验证器 (protocol_validator)                             │
+│  └─ 数据缓存 (routing_cache)                                    │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 与LobsterShell的对应关系
+
+| CDRS层 | LobsterShell层 | 应用场景 |
+|--------|---------------|---------|
+| Layer 1: 组件定义 | ToolInterface | 工具元数据定义 |
+| Layer 2: 编码定义 | ToolManifest | 工具参数schema |
+| Layer 3: 转换规则 | - | 数据格式转换 |
+| Layer 4: 路由执行 | ToolExecutor | 工具调用路由 |
+
+---
+
+## 核心实现要点
+
+### 1. 编码定义元数据 (YAML/JSON)
+```yaml
+component:
+  id: "hcda"
+  name: "Holographic Character Definition Architecture"
+  version: "2.0.1"
+  encoding_scheme: "HCDA_v2.0"
+  total_bits: 48
+  
+  segments:
+    - segment_id: "lang_id"
+      bit_offset: 0
+      bit_length: 8
+      data_type: "enum"
+```
+
+### 2. 转换规则配置
+```yaml
+conversion_rules:
+  - rule_id: "hcda_to_semantic"
+    source_component: "hcda"      # 48 bits
+    target_component: "semantic"  # 64 bits
+    bit_mismatch_strategy: "expand"
+    segment_mapping:
+      - source_segment: "lang_id"
+        target_segment: "lang_id"
+        conversion: "direct"
+```
+
+### 3. 位不匹配策略
+- **expand**: 扩展位数（48 → 64）
+- **truncate**: 截断位数（64 → 48）
+- **map_partial**: 部分映射（192 → 256）
+
+---
+
+## 动态路由引擎
+
+```python
+class RoutingEngine:
+    """主路由引擎"""
+    
+    def route_and_convert(self, data: bytes,
+                         source_component: str,
+                         target_component: str) -> bytes:
+        """路由并转换数据"""
+        
+        # 1. 查找转换规则（直接或路径）
+        # 2. 应用转换规则
+        # 3. 缓存路径
+        # 4. 返回转换结果
+```
+
+---
+
+## 系统优势
+
+✅ **完全变量量化**：所有编码定义都是配置，不用改代码
+✅ **动态路由**：自动寻找最优转换路径
+✅ **即时验证**：转换前验证协议相容性
+✅ **易于扩展**：添加新组件只需新增配置文件
+✅ **自动缓存**：转换路径自动缓存，性能优化
+✅ **向下兼容**：旧编码版本可与新版本共存
+✅ **无中断迁移**：改位数只需更新配置，零停机
+
+---
+
+## LobsterShell应用
+
+### 工具参数转换
+```yaml
+conversion_rules:
+  - rule_id: "tool_input_to_sql"
+    source_component: "tool_input"    # JSON
+    target_component: "sql_query"     # SQL
+    bit_mismatch_strategy: "map_partial"
+    
+    segment_mapping:
+      - source_segment: "query_params"
+        target_segment: "where_clause"
+        conversion: "json_to_sql"
+```
+
+### 审计日志编码
+```yaml
+component:
+  id: "audit_log"
+  total_bits: 256
+  
+  segments:
+    - segment_id: "timestamp"
+      bit_offset: 0
+      bit_length: 64
+      
+    - segment_id: "tool_id"
+      bit_offset: 64
+      bit_length: 32
+      
+    - segment_id: "user_id"
+      bit_offset: 96
+      bit_length: 32
+```
+
+---
+
+## 配置文件结构
+
+```
+config/
+├── routing_config.yaml          # 全局路由配置
+│
+encodings/
+├── hcda_component.yaml          # HCDA 编码定义
+├── istid_component.yaml         # ISTID 编码定义
+├── tool_input_component.yaml    # 工具输入编码
+└── audit_log_component.yaml     # 审计日志编码
+```
+
+---
+
+## 下一步行动
+
+### Phase 1: 配置驱动化
+- [ ] 为每个工具写 `*_component.yaml`
+- [ ] 写 `routing_config.yaml` 定义转换规则
+- [ ] 实现 EncodingDefinitionLoader
+- [ ] 实现 ConversionRuleManager
+
+### Phase 2: 路由执行化
+- [ ] 实现 DynamicConverter
+- [ ] 实现 RoutingEngine
+- [ ] 测试所有转换路径
+
+### Phase 3: 运行时动态化
+- [ ] 实现动态配置更新
+- [ ] 支持运行时添加转换规则
+
+---
+
+*保存者: 小橙 🍊*  
+*保存时间: 2026-02-17*
