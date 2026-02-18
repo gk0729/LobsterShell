@@ -7,6 +7,7 @@ OpenClaw 適配器 - 包裝 OpenClaw Agent
 from typing import Any, Optional, Callable
 from dataclasses import dataclass
 import logging
+from importlib import import_module
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ class OpenClawAdapter:
         Returns:
             WrappedResponse: 包裝後的響應
         """
-        from ..00_core.mode_controller import calculate_sensitivity
+        calculate_sensitivity = import_module("shell.00_core.mode_controller").calculate_sensitivity
 
         # 1. 計算敏感度
         sensitivity = calculate_sensitivity(request)
