@@ -16,9 +16,7 @@ LobsterShell - 微内核 AI Agent 装甲
 """
 
 from typing import Any, Dict, List, Optional
-import importlib.util
 import logging
-from pathlib import Path
 
 # 核心组件
 from .core.interfaces.tool_interface import (
@@ -34,40 +32,9 @@ from .core.tool_runtime.registry import ToolRegistry
 from .core.tool_runtime.executor import ToolExecutor
 
 # 旧版兼容
-_legacy_module_cache: Dict[str, Any] = {}
-
-
-def _load_legacy_core_module(module_name: str, relative_path: str):
-    cache_key = f"{module_name}:{relative_path}"
-    if cache_key in _legacy_module_cache:
-        return _legacy_module_cache[cache_key]
-
-    module_path = (Path(__file__).parent / relative_path).resolve()
-    if not module_path.exists():
-        raise ImportError(f"无法加载旧版核心模块，文件不存在: {module_path}")
-
-    spec = importlib.util.spec_from_file_location(
-        f"lobstershell_legacy_{module_name}",
-        module_path,
-    )
-    if not spec or not spec.loader:
-        raise ImportError(f"无法加载旧版核心模块: {module_name}")
-
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    _legacy_module_cache[cache_key] = module
-    return module
-
-
-_legacy_mode_module = _load_legacy_core_module("mode_controller", "00_core/mode_controller.py")
-_legacy_policy_module = _load_legacy_core_module("policy_engine", "00_core/policy_engine.py")
-_legacy_audit_module = _load_legacy_core_module("audit_logger", "00_core/audit_logger.py")
-
-ModeController = _legacy_mode_module.ModeController
-ModeConfig = _legacy_mode_module.ModeConfig
-PolicyEngine = _legacy_policy_module.PolicyEngine
-AuditLogger = _legacy_audit_module.AuditLogger
-AuditLevel = _legacy_audit_module.AuditLevel
+from .00_core.mode_controller import ModeController, ModeConfig
+from .00_core.policy_engine import PolicyEngine
+from .00_core.audit_logger import AuditLogger
 
 __version__ = "0.2.0"
 __author__ = "LobsterShell Team"
@@ -150,7 +117,6 @@ class LobsterShell:
         mode: ModeConfig = ModeConfig.HYBRID_SHIELD,
         enable_sandbox: bool = True,
         audit_enabled: bool = True,
-        audit_logger_config: Optional[Dict[str, Any]] = None,
     ):
         """
         初始化 LobsterShell
@@ -159,7 +125,6 @@ class LobsterShell:
             mode: 安全模式
             enable_sandbox: 是否启用沙盒
             audit_enabled: 是否启用审计
-            audit_logger_config: 审计日志配置（轮替、存储路径等）
         """
         self.mode = mode
         self.enable_sandbox = enable_sandbox
@@ -177,7 +142,7 @@ class LobsterShell:
         # 旧版组件 (兼容)
         self.mode_controller = ModeController(default_mode=mode)
         self.policy_engine = PolicyEngine()
-        self.audit_logger = AuditLogger(**(audit_logger_config or {})) if audit_enabled else None
+        self.audit_logger = AuditLogger() if audit_enabled else None
         
         # 设置审计回调
         if self.audit_logger:
@@ -214,6 +179,8 @@ class LobsterShell:
     async def _audit_callback(self, audit_data: dict):
         """审计回调"""
         if self.audit_logger:
+            from .00_core.audit_logger import AuditLevel
+            
             self.audit_logger.log(
                 action=audit_data["tool_id"],
                 level=AuditLevel.INFO if audit_data["success"] else AuditLevel.WARNING,
@@ -234,20 +201,3 @@ class LobsterShell:
             "registry": self.registry.export_metadata(),
             "tool_stats": self.registry.get_all_stats(),
         }
-
-    def wrap(self, openclaw_agent: Any):
-        """包裝外部 Agent，接入 LobsterShell 安全流程"""
-        adapter_module = _load_legacy_core_module("openclaw_adapter", "05_adapters/openclaw_adapter.py")
-        return adapter_module.OpenClawAdapter(openclaw_agent, self)
-
-    def get_audit_logs(self):
-        """獲取記憶體中的審計日誌"""
-        if not self.audit_logger:
-            return []
-        return list(self.audit_logger._entries)
-
-    def verify_audit_chain(self) -> bool:
-        """驗證審計鏈完整性"""
-        if not self.audit_logger:
-            return True
-        return self.audit_logger.verify_chain()

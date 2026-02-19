@@ -14,7 +14,6 @@ from ..interfaces.tool_interface import (
     ToolContext,
     ToolResult,
     ToolConfig,
-    Permission,
 )
 from .registry import ToolRegistry
 
@@ -42,18 +41,6 @@ class ToolExecutor:
         self.default_timeout = default_timeout
         self.enable_sandbox = enable_sandbox
         self._audit_callback = None
-
-    SENSITIVE_AUDIT_KEYS = {
-        "password",
-        "passwd",
-        "secret",
-        "token",
-        "apikey",
-        "api_key",
-        "authorization",
-        "auth",
-        "cookie",
-    }
     
     def set_audit_callback(self, callback):
         """设置审计回调"""
@@ -222,28 +209,8 @@ class ToolExecutor:
         - Firecracker VM
         - nsjail
         """
-        metadata = tool.metadata
-        required_permissions = set(metadata.permissions)
-
-        if Permission.PROCESS_EXECUTE in required_permissions:
-            raise PermissionError("沙盒模式禁止 process:execute 权限")
-
-        if not metadata.network_access and (
-            Permission.NETWORK_INTERNAL in required_permissions
-            or Permission.NETWORK_EXTERNAL in required_permissions
-        ):
-            raise PermissionError("工具权限与元数据冲突: 声明网络权限但 network_access=False")
-
-        if not metadata.filesystem_access and (
-            Permission.FILESYSTEM_READ in required_permissions
-            or Permission.FILESYSTEM_WRITE in required_permissions
-        ):
-            raise PermissionError("工具权限与元数据冲突: 声明文件权限但 filesystem_access=False")
-
-        if context.mode == "local_only" and Permission.NETWORK_EXTERNAL in required_permissions:
-            raise PermissionError("local_only 模式禁止外网访问")
-
-        # 当前实现为“策略护栏 + 超时”，用于在真正容器沙盒前先阻挡高风险行为
+        # 目前只是带超时执行
+        # TODO: 实现真正的沙盒
         return await self._execute_with_timeout(tool, context, params, timeout)
     
     async def _audit(
@@ -263,9 +230,9 @@ class ToolExecutor:
                 "tenant_id": context.tenant_id,
                 "session_id": context.session_id,
                 "request_id": context.request_id,
-                "params": self._redact_data(params),
+                "params": params,
                 "success": result.success if result else False,
-                "result_data": self._redact_data(result.data) if result and result.success else None,
+                "result_data": result.data if result and result.success else None,
                 "error": error or (result.error if result else None),
                 "time_ms": time_ms,
             }
@@ -274,20 +241,3 @@ class ToolExecutor:
                 await self._audit_callback(audit_data)
             except Exception as e:
                 logger.error(f"审计回调失败: {e}")
-
-    def _redact_data(self, value: Any) -> Any:
-        """审计数据脱敏"""
-        if isinstance(value, dict):
-            sanitized = {}
-            for key, item in value.items():
-                normalized_key = str(key).lower()
-                if any(secret in normalized_key for secret in self.SENSITIVE_AUDIT_KEYS):
-                    sanitized[key] = "***REDACTED***"
-                else:
-                    sanitized[key] = self._redact_data(item)
-            return sanitized
-
-        if isinstance(value, list):
-            return [self._redact_data(item) for item in value]
-
-        return value

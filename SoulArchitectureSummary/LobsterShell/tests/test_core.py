@@ -5,8 +5,7 @@
 """
 
 import pytest
-from datetime import datetime, UTC
-import importlib.util
+from datetime import datetime
 
 # 由於我們使用相對導入，需要先安裝或調整路徑
 import sys
@@ -14,33 +13,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-
-def _load_legacy_module(module_name: str, file_name: str):
-    module_path = Path(__file__).parent.parent / "00_core" / file_name
-    spec = importlib.util.spec_from_file_location(
-        f"lobstershell_test_{module_name}",
-        module_path,
-    )
-    if not spec or not spec.loader:
-        raise ImportError(f"無法載入模組: {module_name}")
-
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-_mode_module = _load_legacy_module("mode_controller", "mode_controller.py")
-_policy_module = _load_legacy_module("policy_engine", "policy_engine.py")
-_audit_module = _load_legacy_module("audit_logger", "audit_logger.py")
-
-ModeController = _mode_module.ModeController
-ModeConfig = _mode_module.ModeConfig
-calculate_sensitivity = _mode_module.calculate_sensitivity
-PolicyEngine = _policy_module.PolicyEngine
-ActionType = _policy_module.ActionType
-PolicyRule = _policy_module.PolicyRule
-AuditLogger = _audit_module.AuditLogger
-AuditLevel = _audit_module.AuditLevel
+from 00_core.mode_controller import ModeController, ModeConfig, calculate_sensitivity
+from 00_core.policy_engine import PolicyEngine, ActionType, PolicyRule
+from 00_core.audit_logger import AuditLogger, AuditLevel
 
 
 class TestModeController:
@@ -135,7 +110,7 @@ class TestPolicyEngine:
             denied_patterns=[r"test_pattern"],
         ))
 
-        assert any(rule.name == "test_rule" for rule in engine.get_rules())
+        assert engine.get_rule("test_rule") is not None
 
 
 class TestAuditLogger:
@@ -175,48 +150,6 @@ class TestAuditLogger:
         results = logger.search(user_id="user_001")
         assert len(results) == 1
         assert results[0].action == "search_test"
-
-    def test_log_rotation(self, tmp_path):
-        """測試審計日誌輪替"""
-        logger = AuditLogger(
-            storage_path=str(tmp_path),
-            max_file_size_bytes=300,
-            max_backup_files=2,
-        )
-
-        for index in range(20):
-            logger.log(
-                action=f"rotate_{index}",
-                request="x" * 120,
-                response="y" * 120,
-            )
-
-        active_file = tmp_path / "audit.log.jsonl"
-        backup_file = tmp_path / "audit.log.jsonl.1"
-
-        assert active_file.exists()
-        assert backup_file.exists()
-
-    def test_log_rotation_by_date(self, tmp_path):
-        """測試按日期輪替"""
-        logger = AuditLogger(
-            storage_path=str(tmp_path),
-            max_file_size_bytes=10_000,
-            max_backup_files=2,
-            rotate_by_date=True,
-        )
-
-        day1 = datetime(2026, 2, 20, 8, 0, tzinfo=UTC)
-        day2 = datetime(2026, 2, 21, 8, 0, tzinfo=UTC)
-
-        logger.log(action="day1", request="r1", response="s1", timestamp=day1)
-        logger.log(action="day2", request="r2", response="s2", timestamp=day2)
-
-        rotated_day1 = tmp_path / "audit.log.jsonl.2026-02-20"
-        active_file = tmp_path / "audit.log.jsonl"
-
-        assert rotated_day1.exists()
-        assert active_file.exists()
 
 
 if __name__ == "__main__":

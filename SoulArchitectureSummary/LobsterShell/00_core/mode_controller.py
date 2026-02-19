@@ -10,7 +10,6 @@
 from enum import Enum
 from typing import Optional, Callable, Any
 from dataclasses import dataclass
-import re
 import logging
 
 logger = logging.getLogger(__name__)
@@ -71,26 +70,14 @@ class ModeController:
             ModeDecision: 模式決策結果
         """
         # 1. 檢查是否有強制模式覆蓋
-        exact_mode = self._mode_overrides.get(request)
-        if exact_mode:
+        request_hash = hash(request)
+        if request_hash in self._mode_overrides:
+            mode = self._mode_overrides[request_hash]
             return ModeDecision(
-                mode=exact_mode,
+                mode=mode,
                 reason="用戶指定模式覆蓋",
                 confidence=1.0,
             )
-
-        for request_pattern, mode in self._mode_overrides.items():
-            if request_pattern == request:
-                continue
-            try:
-                if re.search(request_pattern, request, re.IGNORECASE):
-                    return ModeDecision(
-                        mode=mode,
-                        reason=f"匹配覆蓋規則: {request_pattern}",
-                        confidence=0.95,
-                    )
-            except re.error:
-                continue
 
         # 2. 根據敏感度決定模式
         if sensitivity_score >= self.local_threshold:

@@ -6,45 +6,9 @@ OpenClaw 適配器 - 包裝 OpenClaw Agent
 
 from typing import Any, Optional, Callable
 from dataclasses import dataclass
-import importlib.util
 import logging
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
-
-
-def _load_calculate_sensitivity():
-    module_path = Path(__file__).resolve().parent.parent / "00_core" / "mode_controller.py"
-    spec = importlib.util.spec_from_file_location(
-        "lobstershell_legacy_mode_controller",
-        module_path,
-    )
-    if not spec or not spec.loader:
-        raise ImportError("无法加载 mode_controller 模块")
-
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.calculate_sensitivity
-
-
-calculate_sensitivity = _load_calculate_sensitivity()
-
-
-def _load_action_type():
-    module_path = Path(__file__).resolve().parent.parent / "00_core" / "policy_engine.py"
-    spec = importlib.util.spec_from_file_location(
-        "lobstershell_legacy_policy_engine",
-        module_path,
-    )
-    if not spec or not spec.loader:
-        raise ImportError("无法加载 policy_engine 模块")
-
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.ActionType
-
-
-ActionType = _load_action_type()
 
 
 @dataclass
@@ -91,6 +55,8 @@ class OpenClawAdapter:
         Returns:
             WrappedResponse: 包裝後的響應
         """
+        from ..00_core.mode_controller import calculate_sensitivity
+
         # 1. 計算敏感度
         sensitivity = calculate_sensitivity(request)
 
@@ -105,7 +71,7 @@ class OpenClawAdapter:
 
         # 3. 策略檢查
         policy_decision = self.shell.policy_engine.check(
-            action=ActionType.QUERY,
+            action="query",  # TODO: 根據請求類型判斷
             content=request,
             context=context,
         )

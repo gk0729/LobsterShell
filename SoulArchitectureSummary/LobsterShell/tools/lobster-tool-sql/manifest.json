@@ -29,6 +29,22 @@
           "row_count": {"type": "integer"}
         }
       }
+    },
+    {
+      "id": "sql.schema_inspect",
+      "name": "数据库模式检查",
+      "module": "schema_inspector",
+      "class": "SchemaInspectorTool",
+      "category": "database",
+      "permissions": ["database:read", "database:metadata"],
+      "dangerous": false,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "database": {"type": "string"},
+          "table": {"type": "string"}
+        }
+      }
     }
   ],
   

@@ -12,12 +12,14 @@ async def main():
     # 1. 初始化 LobsterShell
     shell = LobsterShell(
         mode=ModeConfig.HYBRID_SHIELD,  # 混合模式
-        enable_sandbox=True,
-        audit_enabled=True,
+        local_model="qwen2.5:7b",       # 本地審核模型
+        local_db="postgresql://localhost/mydb",
+        strict_mode=True,
     )
 
     print("🦞 LobsterShell 已初始化")
     print(f"   模式: {shell.mode.value}")
+    print(f"   本地模型: {shell.local_model}")
 
     # 2. 模擬 OpenClaw Agent
     class MockOpenClawAgent:

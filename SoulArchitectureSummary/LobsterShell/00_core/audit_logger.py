@@ -6,12 +6,11 @@
 
 from dataclasses import dataclass, field
 from typing import Optional, Any
-from datetime import datetime, UTC
+from datetime import datetime
 from enum import Enum
 import json
 import hashlib
 import logging
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -81,30 +80,15 @@ class AuditLogger:
     實現不可篡改的審計鏈
     """
 
-    def __init__(
-        self,
-        storage_path: str = "./audit_logs",
-        max_file_size_bytes: int = 1024 * 1024,
-        max_backup_files: int = 3,
-        rotate_by_date: bool = False,
-    ):
+    def __init__(self, storage_path: str = "./audit_logs"):
         self.storage_path = storage_path
-        self._storage_dir = Path(storage_path)
-        self._storage_file = self._storage_dir / "audit.log.jsonl"
-        self._max_file_size_bytes = max_file_size_bytes
-        self._max_backup_files = max_backup_files
-        self._rotate_by_date = rotate_by_date
-        self._active_date: Optional[str] = None
         self._last_hash: Optional[str] = None
         self._entries: list[AuditEntry] = []
-
-        self._storage_dir.mkdir(parents=True, exist_ok=True)
 
     def log(
         self,
         action: str,
         level: AuditLevel = AuditLevel.INFO,
-        timestamp: Optional[datetime] = None,
         **kwargs,
     ) -> AuditEntry:
         """
@@ -118,9 +102,8 @@ class AuditLogger:
         Returns:
             AuditEntry: 審計記錄
         """
-        entry_timestamp = timestamp or datetime.now(UTC)
         entry = AuditEntry(
-            timestamp=entry_timestamp,
+            timestamp=datetime.utcnow(),
             level=level,
             action=action,
             previous_hash=self._last_hash,
@@ -140,71 +123,9 @@ class AuditLogger:
 
     def _persist(self, entry: AuditEntry):
         """持久化審計記錄"""
-        self._rotate_by_date_if_needed(entry.timestamp)
-        self._rotate_if_needed()
-
-        record = {
-            "timestamp": entry.timestamp.isoformat(),
-            "level": entry.level.value,
-            "action": entry.action,
-            "user_id": entry.user_id,
-            "session_id": entry.session_id,
-            "tenant_id": entry.tenant_id,
-            "request": entry.request,
-            "response": entry.response,
-            "mode": entry.mode,
-            "entry_hash": entry.entry_hash,
-            "previous_hash": entry.previous_hash,
-        }
-        with self._storage_file.open("a", encoding="utf-8") as audit_fp:
-            audit_fp.write(json.dumps(record, ensure_ascii=False) + "\n")
-
-    def _rotate_by_date_if_needed(self, timestamp: datetime):
-        """按日期輪替檔案"""
-        if not self._rotate_by_date:
-            return
-
-        current_date = timestamp.astimezone(UTC).date().isoformat()
-        if self._active_date is None:
-            self._active_date = current_date
-            return
-
-        if self._active_date == current_date:
-            return
-
-        if self._storage_file.exists() and self._storage_file.stat().st_size > 0:
-            rotated_target = self._storage_dir / f"audit.log.jsonl.{self._active_date}"
-            sequence = 1
-            while rotated_target.exists():
-                rotated_target = self._storage_dir / f"audit.log.jsonl.{self._active_date}.{sequence}"
-                sequence += 1
-            self._storage_file.replace(rotated_target)
-
-        self._active_date = current_date
-
-    def _rotate_if_needed(self):
-        """根據檔案大小執行輕量輪替"""
-        if self._max_file_size_bytes <= 0 or self._max_backup_files <= 0:
-            return
-
-        if not self._storage_file.exists():
-            return
-
-        if self._storage_file.stat().st_size < self._max_file_size_bytes:
-            return
-
-        oldest_backup = self._storage_dir / f"audit.log.jsonl.{self._max_backup_files}"
-        if oldest_backup.exists():
-            oldest_backup.unlink()
-
-        for index in range(self._max_backup_files - 1, 0, -1):
-            source = self._storage_dir / f"audit.log.jsonl.{index}"
-            target = self._storage_dir / f"audit.log.jsonl.{index + 1}"
-            if source.exists():
-                source.replace(target)
-
-        rotated_first = self._storage_dir / "audit.log.jsonl.1"
-        self._storage_file.replace(rotated_first)
+        # TODO: 實現 WORM 存儲
+        # 可以用 append-only 文件、區塊鏈、或專用 WORM 存儲
+        pass
 
     def verify_chain(self) -> bool:
         """

@@ -19,25 +19,18 @@ try:
         Permission,
     )
 except ImportError:
-    # 开发/单仓库模式兼容导入
-    try:
-        from LobsterShell.core.interfaces.tool_interface import (
-            ToolInterface,
-            ToolMetadata,
-            ToolConfig,
-            ToolContext,
-            ToolResult,
-            Permission,
-        )
-    except ImportError:
-        from core.interfaces.tool_interface import (
-            ToolInterface,
-            ToolMetadata,
-            ToolConfig,
-            ToolContext,
-            ToolResult,
-            Permission,
-        )
+    # 开发时使用相对导入
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent / "core"))
+    from interfaces.tool_interface import (
+        ToolInterface,
+        ToolMetadata,
+        ToolConfig,
+        ToolContext,
+        ToolResult,
+        Permission,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +49,6 @@ class SQLReadOnlyQueryTool(ToolInterface):
     def __init__(self):
         self._engine = None
         self._database_url = None
-        self._default_max_rows = 1000
-        self._max_fetch_batch = 200
     
     @property
     def metadata(self) -> ToolMetadata:
@@ -76,7 +67,6 @@ class SQLReadOnlyQueryTool(ToolInterface):
                 "properties": {
                     "query": {"type": "string"},
                     "database": {"type": "string"},
-                    "max_rows": {"type": "integer", "minimum": 1, "maximum": 5000},
                 },
                 "required": ["query"],
             },
@@ -113,15 +103,6 @@ class SQLReadOnlyQueryTool(ToolInterface):
     ) -> ToolResult:
         """执行 SQL 查询"""
         query = params.get("query", "").strip()
-        max_rows = params.get("max_rows", self._default_max_rows)
-
-        if not isinstance(max_rows, int) or max_rows <= 0:
-            return ToolResult(
-                success=False,
-                error="max_rows 必须是正整数",
-            )
-
-        max_rows = min(max_rows, 5000)
         
         if not query:
             return ToolResult(
@@ -157,13 +138,7 @@ class SQLReadOnlyQueryTool(ToolInterface):
             
             with self._engine.connect() as conn:
                 result = conn.execute(sa.text(query))
-                rows = []
-                while len(rows) < max_rows:
-                    batch_size = min(self._max_fetch_batch, max_rows - len(rows))
-                    batch = result.fetchmany(batch_size)
-                    if not batch:
-                        break
-                    rows.extend(dict(row._mapping) for row in batch)
+                rows = [dict(row._mapping) for row in result]
             
             logger.info(f"✅ 查询成功，返回 {len(rows)} 行")
             
@@ -176,7 +151,6 @@ class SQLReadOnlyQueryTool(ToolInterface):
                 metadata={
                     "query": query,
                     "row_count": len(rows),
-                    "max_rows": max_rows,
                 },
             )
             

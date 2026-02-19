@@ -5,13 +5,11 @@
 """
 
 import importlib
-import importlib.util
 import json
 import asyncio
 from pathlib import Path
 from typing import Dict, List, Optional, Type
 import logging
-import re
 
 from ..interfaces.tool_interface import ToolInterface, ToolMetadata, ToolConfig
 from .registry import ToolRegistry
@@ -40,7 +38,6 @@ class ToolLoader:
         self.registry = registry or ToolRegistry()
         self.loaded_tools: Dict[str, ToolInterface] = {}
         self._tool_packages: Dict[str, Path] = {}  # tool_id -> package_path
-        self._allow_dangerous_tools = False
     
     async def load_from_directory(
         self,
@@ -66,8 +63,6 @@ class ToolLoader:
         # 1. 读取清单
         with open(manifest_path) as f:
             manifest = json.load(f)
-
-        self._validate_manifest(manifest)
         
         logger.info(f"📦 加载工具包: {manifest['name']}@{manifest.get('version', 'unknown')}")
         
@@ -128,25 +123,11 @@ class ToolLoader:
         """
         import subprocess
         import sys
-
-        if not re.fullmatch(r"[a-zA-Z0-9._-]+", package_name):
-            raise ValueError(f"非法包名: {package_name}")
-
-        if not package_name.startswith("lobster-tool-"):
-            raise SecurityError("仅允许安装 lobster-tool-* 官方命名工具包")
         
         # 1. 安装包
         logger.info(f"⬇️  安装 {package_name}...")
         result = subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "pip",
-                "install",
-                "--disable-pip-version-check",
-                "--no-input",
-                package_name,
-            ],
+            [sys.executable, "-m", "pip", "install", package_name],
             capture_output=True,
             text=True,
         )
@@ -156,8 +137,8 @@ class ToolLoader:
         
         # 2. 查找包路径
         try:
-            normalized_name = package_name.replace("-", "_")
-            spec = importlib.util.find_spec(normalized_name) or importlib.util.find_spec(package_name)
+            import importlib.util
+            spec = importlib.util.find_spec(package_name)
             if not spec or not spec.origin:
                 raise ValueError(f"找不到包: {package_name}")
             
@@ -214,30 +195,20 @@ class ToolLoader:
         tool_def: dict,
     ) -> Type[ToolInterface]:
         """动态导入工具类"""
+        import sys
+        
         module_path = tool_def.get("module", "main")
         class_name = tool_def.get("class", "Tool")
-
+        
+        # 添加到 sys.path
         src_dir = package_dir / "src"
-
-        search_base = src_dir if src_dir.exists() else package_dir
-        module_rel_path = Path(*module_path.split("."))
-        candidate_module_file = search_base / f"{module_rel_path}.py"
-        candidate_package_init = search_base / module_rel_path / "__init__.py"
-
-        if candidate_module_file.exists():
-            module_file = candidate_module_file
-        elif candidate_package_init.exists():
-            module_file = candidate_package_init
+        if src_dir.exists():
+            sys.path.insert(0, str(src_dir))
         else:
-            raise ImportError(f"找不到工具模块文件: {module_path}")
-
-        unique_module_name = f"lobstershell_tool_{tool_def.get('id', 'unknown').replace('.', '_')}"
-        spec = importlib.util.spec_from_file_location(unique_module_name, module_file)
-        if not spec or not spec.loader:
-            raise ImportError(f"无法加载工具模块: {module_path}")
-
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
+            sys.path.insert(0, str(package_dir))
+        
+        # 动态导入
+        module = importlib.import_module(module_path)
         tool_class = getattr(module, class_name)
         
         return tool_class
@@ -265,37 +236,12 @@ class ToolLoader:
         # 如果包含危险权限，需要额外验证
         if required_perms & dangerous_perms:
             logger.warning(f"⚠️  工具包包含危险权限: {required_perms & dangerous_perms}")
-            security_cfg = manifest.get("security", {})
-            explicitly_reviewed = bool(security_cfg.get("allow_dangerous_permissions", False))
-            if not (self._allow_dangerous_tools and explicitly_reviewed):
-                logger.error("❌ 危险权限工具包被拒绝，请显式审查后再启用")
-                return False
+            # TODO: 实现更严格的安全检查
+            # - 代码静态分析
+            # - 签名验证
+            # - 用户确认
         
         return True
-
-    def _validate_manifest(self, manifest: dict) -> None:
-        """校验工具清单结构"""
-        required_top_fields = ("name", "version", "tools")
-        for field_name in required_top_fields:
-            if field_name not in manifest:
-                raise ValueError(f"manifest 缺少必填字段: {field_name}")
-
-        tools = manifest.get("tools")
-        if not isinstance(tools, list) or not tools:
-            raise ValueError("manifest.tools 必须是非空列表")
-
-        seen_tool_ids = set()
-        for index, tool_def in enumerate(tools):
-            if not isinstance(tool_def, dict):
-                raise ValueError(f"tools[{index}] 必须是对象")
-            for key in ("id", "module", "class"):
-                if not tool_def.get(key):
-                    raise ValueError(f"tools[{index}] 缺少字段: {key}")
-
-            tool_id = tool_def["id"]
-            if tool_id in seen_tool_ids:
-                raise ValueError(f"重复的 tool id: {tool_id}")
-            seen_tool_ids.add(tool_id)
     
     async def _dependency_check(self, manifest: dict) -> bool:
         """
