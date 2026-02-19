@@ -224,22 +224,34 @@ print('✅ LobsterShell 完整版已就緒！')
 
 ---
 
-### 方法 3：與 OpenClaw 集成
+### 方法 3：與 OpenClaw 控制頁相容（`127.0.0.1:18789`）
 
-```typescript
-// OpenClaw Gateway 中間件（規劃中）
-import { SoulMiddleware } from './soul/soul_architecture';
+LobsterShell 現在提供 OpenClaw Web 相容 Gateway（HTTP + WebSocket 透明代理）。
 
-const gateway = new Gateway({
-  middleware: [
-    new SoulMiddleware({
-      localThreshold: 0.8,    // ≥0.8 強制本地
-      cloudThreshold: 0.3,    // ≤0.3 可上雲
-      enableAudit: true,      // 啟用審計鏈
-    }),
-  ],
-});
+```bash
+# 啟動相容層（預設 listen: 127.0.0.1:18790，轉發到 OpenClaw: 127.0.0.1:18789）
+python -m cli.lobster_cli gateway compat
 ```
+
+一鍵同時啟動（上游 OpenClaw + 相容層）：
+
+```bash
+./scripts/one_click_openclaw_compat.sh
+```
+
+若你要「維持控制頁仍是 127.0.0.1:18789」：
+
+1. 先把 OpenClaw 改跑到 `127.0.0.1:18791`（或任一空閒埠）
+2. 再讓 LobsterShell 相容層監聽 `18789`：
+
+```bash
+python -m cli.lobster_cli gateway compat \
+    --listen-host 127.0.0.1 \
+    --listen-port 18789 \
+    --target-url http://127.0.0.1:18791
+```
+
+這樣你原本的 OpenClaw 網頁入口不需改網址，仍可直接使用。
 
 ---
 

@@ -13,7 +13,9 @@ LobsterShell CLI - 命令行工具
 import asyncio
 import click
 import sys
+from typing import Optional
 from pathlib import Path
+import importlib.util
 
 # 添加 core 到路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -33,6 +35,41 @@ def cli():
 def tool():
     """工具管理"""
     pass
+
+
+@cli.group()
+def gateway():
+    """Gateway 管理"""
+    pass
+
+
+@gateway.command("compat")
+@click.option("--listen-host", default="127.0.0.1", show_default=True, help="相容層監聽 Host")
+@click.option("--listen-port", default=18790, show_default=True, type=int, help="相容層監聽 Port")
+@click.option("--target-url", default="http://127.0.0.1:18789", show_default=True, help="OpenClaw 上游網址")
+@click.option("--timeout", default=120, show_default=True, type=int, help="上游請求逾時秒數")
+def compat_gateway(listen_host: str, listen_port: int, target_url: str, timeout: int):
+    """啟動 OpenClaw Web 介面相容層（HTTP + WebSocket 透明轉發）"""
+    gateway_file = Path(__file__).parent.parent / "01_gateway" / "openclaw_compat_gateway.py"
+    spec = importlib.util.spec_from_file_location("lobstershell_compat_gateway", gateway_file)
+    if not spec or not spec.loader:
+        click.echo("❌ 無法載入相容 Gateway 模組", err=True)
+        sys.exit(1)
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    click.echo("🦞 OpenClaw 相容層啟動中...")
+    click.echo(f"  listen: http://{listen_host}:{listen_port}")
+    click.echo(f"  target: {target_url}")
+    click.echo("  mode: HTTP + WebSocket transparent proxy")
+
+    module.run_compat_gateway(
+        listen_host=listen_host,
+        listen_port=listen_port,
+        target_base=target_url,
+        timeout=timeout,
+    )
 
 
 @tool.command("search")
