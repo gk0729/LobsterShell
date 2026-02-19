@@ -355,7 +355,7 @@ MIT License - 詳見 [LICENSE](LICENSE)
 - **原始項目**：[LobsterShell](https://github.com/gk0729/LobsterShell) by gk0729
 - **抽取工具**：KimiCode
 - **優化整合**：小橙 🍊
-
+- **修Bug整合**：GitHub Copilot GPT-5.3-Codex
 ---
 
 ## 📮 聯繫
