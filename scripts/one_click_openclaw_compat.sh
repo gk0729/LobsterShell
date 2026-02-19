@@ -7,7 +7,6 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HOST="${HOST:-127.0.0.1}"
 OPENCLAW_UPSTREAM_PORT="${OPENCLAW_UPSTREAM_PORT:-18791}"
 COMPAT_LISTEN_PORT="${COMPAT_LISTEN_PORT:-18789}"
-OPENCLAW_PROJECT="${OPENCLAW_PROJECT:-/Users/shinglee/OpenCode/openclaw2}"
 OPENCLAW_BIN="${OPENCLAW_BIN:-/Users/shinglee/.opencode/bin/opencode}"
 
 OPENCLAW_CMD="${OPENCLAW_CMD:-}"
@@ -62,7 +61,7 @@ else
     fi
 
     echo "🚀 啟動 OpenClaw 上游（opencode serve）"
-    "${OPENCLAW_BIN}" serve "${OPENCLAW_PROJECT}" \
+    "${OPENCLAW_BIN}" serve \
       --hostname "${HOST}" \
       --port "${OPENCLAW_UPSTREAM_PORT}" &
   fi
