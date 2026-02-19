@@ -245,6 +245,12 @@ python -m cli.lobster_cli gateway compat
 ./scripts/stop_openclaw_compat.sh
 ```
 
+查看狀態（顯示埠、PID、程序）：
+
+```bash
+./scripts/status_openclaw_compat.sh
+```
+
 若你要「維持控制頁仍是 127.0.0.1:18789」：
 
 1. 先把 OpenClaw 改跑到 `127.0.0.1:18791`（或任一空閒埠）
