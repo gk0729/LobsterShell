@@ -239,6 +239,12 @@ python -m cli.lobster_cli gateway compat
 ./scripts/one_click_openclaw_compat.sh
 ```
 
+一鍵停止（關閉 18789/18791）：
+
+```bash
+./scripts/stop_openclaw_compat.sh
+```
+
 若你要「維持控制頁仍是 127.0.0.1:18789」：
 
 1. 先把 OpenClaw 改跑到 `127.0.0.1:18791`（或任一空閒埠）
