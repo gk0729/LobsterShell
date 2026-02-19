@@ -44,6 +44,8 @@ htmlcov/
 
 # Logs
 *.log
+audit_logs/
+memory/
 
 # Environment
 .env
